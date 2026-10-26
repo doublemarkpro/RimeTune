@@ -1,2 +1,307 @@
-# RimeTune
-RimeTune -中州韵全平台配置中心
+# RimeTune (中州韵输入法配置中心)
+
+RimeTune 是一款专为 **Rime（中州韵输入法引擎）全平台（Windows 小狼毫 Weasel、macOS 鼠须管 Squirrel、Linux ibus/fcitx5-rime）** 量身打造的现代图形化配置与管理中心。
+
+基于 **Tauri 2.x + Rust + React 19 + TypeScript** 构建，具备极小体积、极速启动、多平台路径自动抹平、原生底层支持与高保真现代化视觉体验。
+
+![dashboard](https://github.mianao.info/https://raw.githubusercontent.com/harry10086/picx-images-hosting/master/Rime/dashboard.webp)
+
+---
+
+## 🌟 核心特性
+
+1. **跨平台原生支持与多端适配（Cross-Platform & Multi-Host Architecture）**：
+   - 专为 Rime 家族设计，兼顾 Windows（小狼毫 Weasel）、macOS（鼠须管 Squirrel）与 Linux（fcitx5-rime / ibus-rime）。
+   - 底层重构路径归一化引擎，跨平台备份与词库迁移平滑无损。
+
+2. **Rime 原生补丁体系安全同步（Zero Destruction）**：
+   - 遵循 Rime 原生机制，绝不直接篡改或覆盖底层原始 YAML 文件。
+   - 所有定制化修改一律结构化写入用户目录的 `*.custom.yaml` 的 `patch:` 节点。
+   - 无论日后如何拉取或更新雾凇拼音最新词库与脚本，您的个人定制配置绝不丢失。
+
+3. **主流方案基准支持与深度拆解**：
+   - 深度拆解 [雾凇拼音 rime-ice](https://github.com/harry10086/rime-ice) 带中英文释义功能的配置源。
+   - 完整支持 [万象拼音](https://github.com/amzxyz/rime-wanxiang)、[薄荷输入法](https://github.com/Mintimate/oh-my-rime)、[白霜拼音](https://github.com/gaboolic/rime-frost) 等主流现代输入方案的专属定制化配置。
+   - 可视化提供平翘舌（z↔zh）、鼻边音（l↔n）、唇齿音（f↔h）、前后鼻音等完整模糊音规则开关。
+   - 完整支持 Lua 词典释义滤镜（中英双向释义、最大释义项数、最大字符限制）。
+   - 包含 Emoji 候选、简繁切换、英文混输补全（melt_eng）及 Markdown 成对符号居中。
+
+4. **Octagram 上下文语言模型完整支持**：
+   - **自动扫描与识别**：后端底层自动扫描 Rime 用户目录下所有 `*.gram` 语言模型文件（如万象官方 `wanxiang-lts-zh-hans.gram`），自动提取模型标识与文件大小，并在系统仪表盘以专属诊断卡片直观呈现；
+   - **零破坏补丁自动挂载**：遵循 Rime 原生规范，开启时结构化写入 `grammar/language`、`grammar/collocation_max_length`、`grammar/collocation_min_length` 及 `translator/contextual_suggestions: false` 补丁，关闭时安全卸载，彻底打通长句智能预测能力；
+   - **科学调校搭配长度**：根据万象官方推荐调优基准，将搭配最大长度滑块科学收拢至 `2~8` 范围并明确标注 **`推荐 5~6 词 (万象官方基准)`**，在获得极佳整句命中率的同时彻底规避长句输入卡顿掉帧。
+
+5. **实时候选框所见即所得模拟渲染与皮肤方案定制**：
+   - 内置真实候选框渲染模拟引擎。
+   - 实时预览横排/竖排布局、预编辑拼音光标、皮肤配色、候选字号、圆角与边框。
+   - **支持 Win11 强调色指示条 (`hilited_mark_color`)**：完整支持并解析 Windows 11 输入法经典的侧边高亮强调色条，内置 Win11 浅色与 Win11 暗色两套高质量皮肤预设；
+   - 精选收录雾凇拼音与小狼毫经典高颜值皮肤（纯粹 Purity、远山雪 Nord、微信键盘风等），支持一键“恢复默认颜色”。
+   - **新建与直接复制导入皮肤方案**：
+     - 支持直接粘贴皮肤 YAML 代码（兼容 `argb`、`rgba`、`abgr` 及各类 16 进制颜色格式），内置严谨语法校验；
+     - 自动为缺失项补齐黑白默认值，无需繁琐补全每个颜色字段；
+     - 支持一键将当前选中的任意皮肤导出为标准 YAML 配置并复制到剪贴板，方便跨设备迁移与社区分享；
+     - 新增**实时打字测试框**：无需切换外部应用即可随时呼出输入法，直观验证候选框排版、圆角、字体、中英切换及按键行为。
+
+6. **无损外挂自定义词典与扩展词库（Lossless Custom Dictionaries）**：
+   - 支持一键导入外部 `.dict.yaml`、`txt` 文本词库，或一键新建自定义空词库。
+   - 采用标准 Rime 扩展挂载架构：自动在用户目录维护 `rime_ice.extended.dict.yaml` 并通过补丁挂载，**完全不改动原版词库文件**。
+   - 上游更新方案源码或重新拉取词库时，个人专业词库永不冲突、永不丢失。
+   - 支持在界面中直观开关挂载状态、调出系统默认编辑器直接编辑词条、或在系统文件管理器中一键高亮定位。
+
+7. **自定义短语与快捷输入（智能适配双拼 `custom_phrase_double.txt`）**：
+   - 可视化表格管理用户目录下的 `custom_phrase.txt` 与双拼专用 `custom_phrase_double.txt`。
+   - **智能识别双拼方案**：根据当前主方案（小鹤双拼、自然码、微软双拼等）自动匹配并加载双拼短语文件，避免双拼两键编码冲突；
+   - 支持全拼/双拼双轨短语随时切换查看，自动提示当前方案生效状态并展示词条数统计；
+   - 支持快捷录入手机号、常用邮箱、模板文字，支持快速增删改查、外部编辑器调用及导出备份。
+
+8. **特定应用专属行为（app_options）**：
+   - 针对终端（Windows Terminal, CMD, PowerShell, iTerm）、代码编辑器（VS Code）、浏览器等独立设置启动时默认英文模式或行内预编辑。
+
+9. **用户词典同步（Rime Sync）与跨设备同步管理**：
+   - 可视化配置 `installation.yaml` 中的设备识别代号（`installation_id`）与全局同步目录（`sync_dir`，支持网盘与坚果云）。
+   - 支持选择同步文件夹、一键打开同步目标目录，以及直接调用后台部署程序触发静默同步。
+
+10. **自动时间戳备份、Diff 比对与一键安全回滚**：
+    - 每次保存写入补丁前自动生成时间戳备份。
+    - 内置 Diff 差异查看器，清楚展示每次改动的 YAML 内容对比。
+    - 支持一键还原至任意历史版本。
+
+11. **静默自动重新部署与防卡死保护（Silent Deploy & Anti-Freeze）**：
+    - 自动探测输入法安装路径与可执行部署程序。
+    - **全局进程互斥与超时保护**：内置全局原子锁与 45 秒超时机制，杜绝多次快速点击导致部署程序争抢文件锁引发的无响应与死锁；
+    - **全局部署加载遮罩**：保存并部署时自动显示全屏防重入遮罩并互斥锁定所有操作按钮，彻底消除高频点击导致的系统未响应判定与白屏强制结束；
+    - 后台调用注入静默标志，部署过程无控制台黑色弹窗闪烁。
+
+---
+
+## 🛠️ 多平台开发与构建指南 (Multiplatform Guide)
+
+### 1. 前置环境要求 (Prerequisites)
+
+在开始克隆和运行本项目前，请确保您的开发环境中已安装以下核心工具：
+
+#### 🌐 通用核心依赖（全平台必需）
+- **Node.js**：推荐版本 `v20.x` LTS 以上（自带 npm 包管理器）。
+  - 验证命令：`node -v`、`npm -v`
+- **Rust 编译环境 (Rust toolchain)**：Tauri 2.x 底层由 Rust 驱动，需要 Rust 编译器与 Cargo 工具。
+  - 安装方法：访问 [Rust 官方安装指南](https://www.rust-lang.org/tools/install) 安装 `rustup`。
+  - 验证命令：`rustc --version`、`cargo --version`
+
+#### 🪟 Windows 环境补充
+- **Microsoft C++ Build Tools**：MSVC 编译链接器（通过 Visual Studio Installer 安装，务必勾选 **“使用 C++ 的桌面开发”**）。
+- **WebView2 Runtime**：Windows 10/11 通常已默认随系统预装。
+
+#### 🍎 macOS 环境补充 (支持 Intel 与 Apple Silicon M系列)
+- **Xcode Command Line Tools**：终端执行以下命令安装编译工具链：
+  ```bash
+  xcode-select --install
+  ```
+- *注：macOS 原生使用操作系统的 WebKit (WKWebView)，无需安装额外的 WebView 运行库。*
+
+#### 🐧 Linux 环境补充 (Ubuntu / Debian / Arch / Fedora 等)
+Linux 下需要安装 WebKitGTK 与 GTK3 等开发依赖库：
+- **Ubuntu / Debian / Mint / Deepin / UOS**：
+  ```bash
+  sudo apt-get update && sudo apt-get install -y \
+    libwebkit2gtk-4.1-dev \
+    libappindicator3-dev \
+    librsvg2-dev \
+    patchelf \
+    libssl-dev \
+    libgtk-3-dev \
+    build-essential
+  ```
+- **Arch Linux / Manjaro**：
+  ```bash
+  sudo pacman -S webkit2gtk-4.1 base-devel openssl libappindicator-gtk3 librsvg patchelf
+  ```
+- **Fedora / RHEL**：
+  ```bash
+  sudo dnf install \
+    webkit2gtk4.1-devel \
+    openssl-devel \
+    libappindicator-gtk3-devel \
+    librsvg2-devel \
+    @development-tools
+  ```
+
+---
+
+### 2. 获取源码与依赖安装 (Setup)
+
+```bash
+# 1. 克隆代码仓库至本地
+git clone https://github.com/harry10086/RimeTune.git
+
+# 2. 进入项目主目录
+cd RimeTune
+
+# 3. 安装前端模块依赖 (React 19 / TypeScript / Vite / Lucide-react 等)
+npm install
+```
+
+> 💡 **说明**：Rust 后端核心依赖已在 `src-tauri/Cargo.toml` 中配置好。在首次运行开发或打包指令时，Cargo 会自动下载并编译所有依赖库，**无需手动安装**。
+
+---
+
+### 3. 本地开发与实时热更新 (Development)
+
+在 Windows、macOS 或 Linux 终端中执行相同的一键启动命令：
+
+```bash
+npm run tauri dev
+```
+
+- **开发特性说明**：
+  - **前端热重载 (HMR)**：修改 `src/` 下的任意 React 组件、TS 逻辑或 CSS 样式后，桌面窗口毫秒级实时刷新，无需重启应用。
+  - **后端自动重编译**：修改 `src-tauri/src/` 下的 Rust 代码时，Tauri 会自动重新编译底层二进制并重载窗口。
+  - **开发者工具 (DevTools)**：
+    - Windows / Linux：在应用窗口中按下 `F12` 键即可呼出开发者调试控制台；
+    - macOS：按下 `Cmd + Option + I` 即可打开 WebKit 调试控制台。
+
+---
+
+### 4. 生产构建与打包发布 (Build & Release)
+
+针对各操作系统平台，RimeTune 支持生成对应的标准发布格式：
+
+#### 🪟 Windows 平台打包
+- **方案 A：纯绿色便携单文件版 (Portable EXE) — 推荐日常使用**
+  ```bash
+  npm run build:portable
+  ```
+  - **输出文件**：`src-tauri/target/release/RimeTune.exe`
+  - **体积优势**：体积仅约 **4~5 MB**，双击秒开，原生无冗余，不在系统留下残留。
+- **方案 B：完整向导安装包 (NSIS Setup / MSI)**
+  ```bash
+  npm run build:installer   # 或 npm run tauri build
+  ```
+  - **输出文件**：`src-tauri/target/release/bundle/nsis/RimeTune_0.3.0_x64-setup.exe`
+
+#### 🍎 macOS 平台打包 (生成 .dmg 镜像与 .app 包)
+在 macOS 终端中运行：
+```bash
+# 标准打包（适配当前 Mac 架构）
+npm run tauri build
+
+# 或针对 Apple Silicon (M1/M2/M3/M4) 芯片专门构建
+npm run tauri build -- --target aarch64-apple-darwin
+
+# 或针对 Intel (x86_64) 芯片专门构建
+npm run tauri build -- --target x86_64-apple-darwin
+
+# 或生成兼顾两种架构的 Universal 通用二进制包
+npm run tauri build -- --target universal-apple-darwin
+```
+- **输出文件**：
+  - `.dmg` 拖拽式安装镜像：`src-tauri/target/release/bundle/dmg/RimeTune_0.3.0_aarch64.dmg`
+  - `.app` 应用程序包：`src-tauri/target/release/bundle/macos/RimeTune.app`
+
+#### 🐧 Linux 平台打包 (生成 .deb、.AppImage 与独立二进制)
+在 Linux 终端中运行：
+```bash
+# 生成 .deb 与 .AppImage 完整发布包
+npm run tauri build
+
+# 或仅生成免安装独立 ELF 二进制程序
+npm run build:portable
+```
+- **输出文件**：
+  - `.deb` 安装包（Ubuntu / Debian 双击或 `sudo dpkg -i` 安装）：`src-tauri/target/release/bundle/deb/RimeTune_0.3.0_amd64.deb`
+  - `.AppImage` 免安装便携版（赋予执行权限 `chmod +x` 即可直接双击运行）：`src-tauri/target/release/bundle/appimage/RimeTune_0.3.0_amd64.AppImage`
+  - 独立 ELF 二进制文件：`src-tauri/target/release/RimeTune`
+
+---
+
+### 5. 跨平台常见问题排查 (Multiplatform FAQ)
+
+#### 🪟 Windows 相关
+- **Q: PowerShell 提示“无法加载脚本，因为在此系统上禁止运行脚本” (`PSSecurityException`)**
+  - **解决**：在终端执行 `Set-ExecutionPolicy -ExecutionPolicy RemoteSigned -Scope CurrentUser` 放行权限，或直接在 CMD 中执行 `npm run ...`。
+- **Q: Cargo 编译报错 `error: linker link.exe not found`**
+  - **解决**：通过 Visual Studio Installer 安装“使用 C++ 的桌面开发”工作负载。
+- **Q: 提示 `Blocking waiting for file lock on build directory`**
+  - **解决**：在任务管理器中关闭残留的 `RimeTune.exe` 调试进程后再重新编译。
+
+#### 🍎 macOS 相关
+- **Q: 首次打开提示“无法打开 RimeTune，因为无法验证开发者”或“已损坏” (Gatekeeper 拦截)**
+  - **原因**：应用未购买苹果开发者证书进行代码公证 (Notarization)。
+  - **解决**：
+    1. 打开系统「设置」 -> 「隐私与安全性」，滑到底部点击「仍要打开」；
+    2. 或在终端执行以下命令移除隔离属性：
+       ```bash
+       xattr -cr /Applications/RimeTune.app
+       ```
+- **Q: 鼠须管 (Squirrel) 配置文件存放路径在哪里？**
+  - **位置**：默认位于 `~/Library/Rime` 目录。RimeTune 启动时会自动检测并绑定该路径。
+
+#### 🐧 Linux 相关
+- **Q: 编译报错 `Package 'webkit2gtk-4.1', not found` 或缺少 openssl**
+  - **解决**：检查系统是否安装了 `libwebkit2gtk-4.1-dev`（Ubuntu/Debian）或 `webkit2gtk-4.1`（Arch），详见上方 Linux 依赖安装指南。
+- **Q: Fcitx5-Rime 与 IBus-Rime 用户目录默认在哪里？**
+  - **Fcitx5-Rime**：`~/.local/share/fcitx5/rime` 或 `~/.config/fcitx5/rime`；
+  - **IBus-Rime**：`~/.config/ibus/rime`；
+  - RimeTune 在 Linux 环境下会自动遍历以上标准目录并加载对应补丁。
+- **Q: 如何在 Linux 下静默重新部署 Rime？**
+  - **说明**：RimeTune 会优先调用系统 PATH 中的 `rime_deployer` 工具；若使用 Fcitx5，保存后也可在终端直接执行 `fcitx5-remote -r` 快速重载。
+
+---
+
+## 📂 项目结构
+```
+RimeTune/
+├── src-tauri/               # Rust 后端核心
+│   ├── Cargo.toml
+│   ├── tauri.conf.json
+│   └── src/
+│       ├── detector.rs      # Rime 输入法宿主环境与语言模型探测
+│       ├── patcher.rs       # 安全的 Rime custom.yaml 补丁读写引擎
+│       ├── deployer.rs      # 静默重新部署子进程调用与互斥锁
+│       ├── backup.rs        # 时间戳备份、差异对比与回滚
+│       ├── phrases.rs       # custom_phrase.txt 表格化解析与序列化
+│       └── lib.rs           # Tauri IPC 命令注册与全链路集成测试
+└── src/                     # React 前端现代 UI
+    ├── components/
+    │   ├── CandidatePreview.tsx # 实时候选框高保真预览与打字测试
+    │   ├── DashboardView.tsx    # 仪表盘与环境诊断
+    │   ├── AppearanceView.tsx   # 外观、皮肤、横竖排与圆角
+    │   ├── RimeIceView.tsx      # 多方案功能开关、Octagram 模型与词库
+    │   ├── KeysView.tsx         # 翻页按键与中英切换习惯
+    │   ├── PhrasesView.tsx      # 自定义短语可视化表格
+    │   ├── AppRulesView.tsx     # 特定应用英文模式规则
+    │   └── BackupDiffView.tsx   # 备份历史与 Diff 比对回滚
+    ├── types.ts             # 强类型定义
+    ├── index.css            # 现代深色设计系统
+    └── App.tsx              # 应用主体与导航
+```
+
+---
+
+## 📦 版本更新日志
+
+### v0.3.0 版本更新摘要
+ * 🚀 **WeaselTune 全新升级为 RimeTune 跨平台配置中心**：
+   - 从原专属 Windows 小狼毫工具蜕变为统一的 **RimeTune** 中州韵输入法全平台配置中心；
+   - 底层路径归一化重构，保障跨环境一致性。
+ * 🧠 **万象拼音 Octagram 上下文语言模型完整支持**：
+   - **自动扫描与识别**：后端底层自动扫描 Rime 用户目录下所有 `*.gram` 语言模型文件（如万象官方 `wanxiang-lts-zh-hans.gram`），自动提取模型标识与文件大小，并在系统仪表盘以专属诊断卡片直观呈现；
+   - **零破坏补丁自动挂载**：遵循 Rime 原生规范，开启时结构化写入 `grammar/language`、`grammar/collocation_max_length`、`grammar/collocation_min_length` 及 `translator/contextual_suggestions: false` 补丁，关闭时安全卸载，彻底打通万象方案的长句预测能力；
+   - **科学调校搭配长度**：根据万象官方推荐调优基准，将搭配最大长度滑块科学收拢至 `2~8` 范围并明确标注 **`推荐 5~6 词 (万象官方基准)`**，在获得极佳整句命中率的同时彻底规避长句输入卡顿掉帧。
+ * 🐞 **彻底解决 Caps Lock 锁定后触发输入法及退格卡死 Bug**：
+   - **补全 Rime 切换键定义**：修复了在生成 `default.custom.yaml` 的 `ascii_composer/switch_key` 块时缺失 `Caps_Lock` 定义的缺陷，防止整块字典覆盖导致输入法 Caps Lock 绑定置空；
+   - **打通经典大写锁定与动作控制**：后端与界面全面打通 `Caps_Lock`（默认 `clear`）与 `good_old_caps_lock` 开关，确保开启大写锁定时清空未完成拼音并直通西文，彻底杜绝状态异常与退格乱删卡死；
+   - **交互界面可配置**：在「快捷按键」模块增加 Caps Lock 切换行为下拉选择框，并提供防坑说明。
+ * 🌐 **彻底修复同步备份目录多语言编码乱码问题**：
+   - **消除终端默认编码污染**：重构底层目录选择器与词库导入文件选择器的跨进程通信管道，路径在底层按 UTF-8 十六进制字节传递并安全解码；
+   - **全球系统语言与代码页兼容**：彻底免疫 Windows 各版本、日文系统语言包或不同 ANSI/OEM 代码页（如 CP936/CP932）干扰，选择中文目录（如 `E:\同步目录\`）不再发生乱码。
+ * 🎨 **主题皮肤功能增强与 Win11 原生风格支持**：
+   - **支持 Win11 强调色指示条 (`hilited_mark_color`)**：完整支持并解析 Win11 输入法经典的侧边高亮强调色条，内置 Win11 浅色与 Win11 暗色两套高质量皮肤预设；
+   - **一键导出皮肤 YAML**：外观界面新增「导出皮肤 YAML」功能，支持将当前选中的任意皮肤一键导出为标准的 Rime YAML 配置并复制到剪贴板，方便跨设备迁移与社区分享；
+   - **新增实时打字测试框**：在外观界面顶部提供即时输入测试框，无需切换外部应用即可随时呼出输入法，直观验证候选框排版、圆角、字体、中英切换及 Caps Lock 行为。
+ * ⚡ **双拼自定义短语智能识别与管理 (`custom_phrase_double.txt`)**：
+   - **方案自动推导匹配**：检测到当前方案为双拼方案（如小鹤双拼、自然码双拼、微软双拼等）时，自动优先匹配加载 `custom_phrase_double.txt`，遵循 Rime 双拼两键成音规范，杜绝全拼短语编码冲突；
+   - **双轨短语切换器**：在短语界面提供「全拼短语 (`custom_phrase.txt`)」与「双拼短语 (`custom_phrase_double.txt`)」一键切换，清晰展示各文件词条统计与「当前生效」推荐徽章；
+   - **自动初始化与外设联动**：文件未生成时添加或保存自动生成合规模板；文件管理器定位与外部编辑器编辑精准指向对应文件。
+ * 🛡️ **全局进程互斥防重入与部署遮罩**：
+   - **全局原子进程互斥锁**：防止连续点击导致多个部署程序并发争抢词库文件锁引发的无响应死锁；
+   - **异步超时与模态遮罩**：部署与同步命令改走异步线程调度，设置 45 秒超时上限并注入无窗口标志；重新部署期间展示高保真全屏半透明防重入遮罩，锁定操作按钮，彻底杜绝系统未响应与白屏退出。

@@ -1,0 +1,111 @@
+name: Multiplatform Release
+
+on:
+  push:
+    tags:
+      - 'v*'
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    name: Build & Release (${{ matrix.platform }})
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - platform: 'windows-latest'
+            target: 'x86_64-pc-windows-msvc'
+            args: ''
+          - platform: 'macos-latest'
+            target: 'aarch64-apple-darwin'
+            args: '--target aarch64-apple-darwin'
+          - platform: 'ubuntu-22.04'
+            target: 'x86_64-unknown-linux-gnu'
+            args: ''
+
+    runs-on: ${{ matrix.platform }}
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: 'npm'
+
+      - name: Install Rust toolchain
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: ${{ matrix.target }}
+
+      - name: Install Linux dependencies
+        if: matrix.platform == 'ubuntu-22.04'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y libwebkit2gtk-4.1-dev libappindicator3-dev librsvg2-dev patchelf libssl-dev libgtk-3-dev build-essential
+
+      - name: Install frontend dependencies
+        run: npm ci
+
+      - name: Build Tauri App
+        uses: tauri-apps/tauri-action@v0
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          tagName: ${{ github.ref_name }}
+          releaseName: 'RimeTune ${{ github.ref_name }}'
+          releaseBody: |
+            ## 🌟 RimeTune ${{ github.ref_name }} 版本发布
+
+            RimeTune 是一款专为 **Rime（中州韵输入法引擎）全平台（Windows 小狼毫 Weasel、macOS 鼠须管 Squirrel、Linux ibus/fcitx5-rime）** 量身打造的现代图形化配置与管理中心。
+
+            ---
+
+            ### 🚀 更新亮点
+            - **WeaselTune 全新升级为 RimeTune 跨平台配置中心**：从原专属 Windows 小狼毫工具正式蜕变升级为统一的 Rime 中州韵全平台配置中心；
+            - **底层路径归一化重构**：消除跨系统环境下的路径解析差异，保障配置备份与词库迁移平滑无损；
+            - **万象拼音 Octagram 上下文语言模型完整支持**：
+              - 自动扫描并识别用户目录下所有 `*.gram` 语言模型文件（如官方 `wanxiang-lts-zh-hans.gram`），并在仪表盘呈现专属诊断卡片；
+              - 零破坏挂载补丁，支持一键启用/禁用；
+              - 科学调校搭配最大长度（2~8 词，推荐 5~6 词官方基准），兼顾极佳长句预测命中率与零延迟响应；
+            - **Windows 11 原生侧边强调色 (`hilited_mark_color`) 与实时打字测试框**：支持候选框强调色指示条并内置实时交互打字测试区；
+            - **双轨自定义短语管理 (`custom_phrase_double.txt`)**：智能识别双拼主方案（小鹤、自然码等）并优先加载双拼短语，支持全拼/双拼双轨随时切换；
+            - **全局进程互斥与部署防卡死保护**：全局原子锁与 45s 超时机制，搭配全屏防重入遮罩，彻底杜绝高频点击导致的系统未响应与白屏退出；
+            - **跨进程通信编码优化**：彻底消除多语言环境与终端路径乱码问题。
+
+            ---
+
+            ### 💻 系统与平台支持 (System Requirements)
+            - **🪟 Windows**：Windows 10 / 11 (64位)
+              - `RimeTune.exe`：绿色免安装便携版（解压即用）
+              - `RimeTune_*_x64-setup.exe`：向导安装包（带桌面图标与标准卸载）
+            - **🍎 macOS**：macOS 11 (Big Sur) 及以上（支持 Apple Silicon M1/M2/M3/M4 系列与 Intel 架构）
+              - `.dmg`：拖拽式安装镜像
+              - `.app`：独立应用程序包
+            - **🐧 Linux**：Ubuntu 22.04+、Debian 11/12、Arch Linux、Fedora 38+、Linux Mint、Deepin / 统信 UOS 等
+              - `.AppImage`：免安装便携单文件
+              - `.deb`：Debian / Ubuntu 系标准安装包
+
+            ---
+
+            ### ⚠️ 各平台安装与运行温馨提示 (Important Notes)
+
+            #### 🍎 macOS 用户（解决“无法打开”或“已损坏”提示）：
+            由于开源个人应用未购买苹果开发者证书进行付费代码公证，首次下载打开时 macOS 的 Gatekeeper 安全机制可能会拦截并提示 *“无法打开，因为无法验证开发者”* 或 *“已损坏，请移至废纸篓”*。**请放心，软件完全开源无害，只需通过以下任意一种方式解除拦截即可永久正常运行：**
+            - **方法 1（图形界面放行，推荐）**：打开 Mac **「系统设置」** -> **「隐私与安全性」**，滑到最下方“安全性”一栏，点击 **「仍要打开」 (Open Anyway)** 并输入开机密码即可；
+            - **方法 2（终端一行命令解除隔离）**：将应用拖入“应用程序”文件夹后，打开终端执行：
+              ```bash
+              sudo xattr -cr /Applications/RimeTune.app
+              ```
+
+            #### 🐧 Linux 用户（运行说明）：
+            - **AppImage 用户**：下载 `.AppImage` 文件后，右键「属性」-> 勾选「允许作为程序执行文件」，或在终端执行 `chmod +x RimeTune_*.AppImage`，随后直接双击即可运行；
+            - **Deb 用户**：双击安装或在终端执行 `sudo dpkg -i RimeTune_*.deb`；
+            - **宿主支持**：自动检测并适配 Fcitx5-Rime 与 IBus-Rime 用户目录。
+          releaseDraft: false
+          prerelease: false
+          args: ${{ matrix.args }}
