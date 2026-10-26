@@ -1,6 +1,9 @@
 use serde::{Deserialize, Serialize};
 use std::path::{Path, PathBuf};
+
+#[cfg(windows)]
 use winreg::enums::*;
+#[cfg(windows)]
 use winreg::RegKey;
 
 #[derive(Serialize, Deserialize, Clone, Debug)]
@@ -32,77 +35,133 @@ pub fn detect_weasel_paths() -> (Option<String>, Option<String>, Option<String>)
     let mut weasel_root: Option<String> = None;
     let mut user_dir: Option<String> = None;
 
-    let subkeys = [
-        (HKEY_CURRENT_USER, r"Software\Rime\Weasel"),
-        (HKEY_LOCAL_MACHINE, r"Software\WOW6432Node\Rime\Weasel"),
-        (HKEY_LOCAL_MACHINE, r"Software\Rime\Weasel"),
-    ];
+    #[cfg(windows)]
+    {
+        let subkeys = [
+            (HKEY_CURRENT_USER, r"Software\Rime\Weasel"),
+            (HKEY_LOCAL_MACHINE, r"Software\WOW6432Node\Rime\Weasel"),
+            (HKEY_LOCAL_MACHINE, r"Software\Rime\Weasel"),
+        ];
 
-    for (hkey, subkey) in &subkeys {
-        if let Ok(key) = RegKey::predef(*hkey).open_subkey(subkey) {
-            if weasel_root.is_none() {
-                if let Ok(val) = key.get_value::<String, _>("WeaselRoot") {
-                    if !val.trim().is_empty() && Path::new(&val).exists() {
-                        weasel_root = Some(val);
+        for (hkey, subkey) in &subkeys {
+            if let Ok(key) = RegKey::predef(*hkey).open_subkey(subkey) {
+                if weasel_root.is_none() {
+                    if let Ok(val) = key.get_value::<String, _>("WeaselRoot") {
+                        if !val.trim().is_empty() && Path::new(&val).exists() {
+                            weasel_root = Some(val);
+                        }
+                    }
+                }
+                if weasel_root.is_none() {
+                    if let Ok(val) = key.get_value::<String, _>("InstallDir") {
+                        if !val.trim().is_empty() && Path::new(&val).exists() {
+                            weasel_root = Some(val);
+                        }
+                    }
+                }
+                if user_dir.is_none() {
+                    if let Ok(val) = key.get_value::<String, _>("RimeUserDir") {
+                        if !val.trim().is_empty() && Path::new(&val).exists() {
+                            user_dir = Some(val);
+                        }
                     }
                 }
             }
-            if weasel_root.is_none() {
-                if let Ok(val) = key.get_value::<String, _>("InstallDir") {
-                    if !val.trim().is_empty() && Path::new(&val).exists() {
-                        weasel_root = Some(val);
-                    }
-                }
-            }
-            if user_dir.is_none() {
-                if let Ok(val) = key.get_value::<String, _>("RimeUserDir") {
-                    if !val.trim().is_empty() && Path::new(&val).exists() {
-                        user_dir = Some(val);
-                    }
+        }
+
+        if user_dir.is_none() {
+            if let Ok(appdata) = std::env::var("APPDATA") {
+                let p = PathBuf::from(appdata).join("Rime");
+                if p.exists() {
+                    user_dir = Some(p.to_string_lossy().to_string());
                 }
             }
         }
     }
 
-    if user_dir.is_none() {
-        if let Ok(appdata) = std::env::var("APPDATA") {
-            let p = PathBuf::from(appdata).join("Rime");
-            if p.exists() {
-                user_dir = Some(p.to_string_lossy().to_string());
+    #[cfg(target_os = "macos")]
+    {
+        if let Ok(home) = std::env::var("HOME") {
+            let rime_dir = PathBuf::from(&home).join("Library/Rime");
+            if rime_dir.exists() {
+                user_dir = Some(rime_dir.to_string_lossy().to_string());
+            }
+        }
+        let squirrel_app = Path::new("/Library/Input Methods/Squirrel.app");
+        if squirrel_app.exists() {
+            weasel_root = Some(squirrel_app.to_string_lossy().to_string());
+        }
+    }
+
+    #[cfg(target_os = "linux")]
+    {
+        if let Ok(home) = std::env::var("HOME") {
+            let candidates = [
+                PathBuf::from(&home).join(".local/share/fcitx5/rime"),
+                PathBuf::from(&home).join(".config/fcitx5/rime"),
+                PathBuf::from(&home).join(".config/ibus/rime"),
+            ];
+            for c in &candidates {
+                if c.exists() {
+                    user_dir = Some(c.to_string_lossy().to_string());
+                    break;
+                }
             }
         }
     }
 
     let mut deployer: Option<String> = None;
-    if let Some(ref root) = weasel_root {
-        let p = PathBuf::from(root).join("WeaselDeployer.exe");
-        if p.exists() {
-            deployer = Some(p.to_string_lossy().to_string());
+
+    #[cfg(windows)]
+    {
+        if let Some(ref root) = weasel_root {
+            let p = PathBuf::from(root).join("WeaselDeployer.exe");
+            if p.exists() {
+                deployer = Some(p.to_string_lossy().to_string());
+            }
+        }
+
+        if deployer.is_none() {
+            let candidates = [
+                r"C:\Program Files\Rime\weasel-0.17.0\WeaselDeployer.exe",
+                r"C:\Program Files\Rime\weasel-0.16.3\WeaselDeployer.exe",
+                r"C:\Program Files\Rime\weasel-0.16.2\WeaselDeployer.exe",
+                r"C:\Program Files\Rime\weasel-0.16.1\WeaselDeployer.exe",
+                r"C:\Program Files\Rime\weasel-0.16.0\WeaselDeployer.exe",
+                r"C:\Program Files (x86)\Rime\weasel-0.16.3\WeaselDeployer.exe",
+                r"C:\Program Files (x86)\Rime\weasel-0.16.2\WeaselDeployer.exe",
+                r"C:\Program Files (x86)\Rime\weasel-0.16.1\WeaselDeployer.exe",
+                r"C:\Program Files (x86)\Rime\weasel-0.16.0\WeaselDeployer.exe",
+                r"C:\Program Files\Rime\WeaselDeployer.exe",
+                r"C:\Program Files (x86)\Rime\WeaselDeployer.exe",
+            ];
+            for c in &candidates {
+                if Path::new(c).exists() {
+                    deployer = Some(c.to_string());
+                    if weasel_root.is_none() {
+                        if let Some(parent) = Path::new(c).parent() {
+                            weasel_root = Some(parent.to_string_lossy().to_string());
+                        }
+                    }
+                    break;
+                }
+            }
         }
     }
 
-    if deployer.is_none() {
-        let candidates = [
-            r"C:\Program Files\Rime\weasel-0.17.0\WeaselDeployer.exe",
-            r"C:\Program Files\Rime\weasel-0.16.3\WeaselDeployer.exe",
-            r"C:\Program Files\Rime\weasel-0.16.2\WeaselDeployer.exe",
-            r"C:\Program Files\Rime\weasel-0.16.1\WeaselDeployer.exe",
-            r"C:\Program Files\Rime\weasel-0.16.0\WeaselDeployer.exe",
-            r"C:\Program Files (x86)\Rime\weasel-0.16.3\WeaselDeployer.exe",
-            r"C:\Program Files (x86)\Rime\weasel-0.16.2\WeaselDeployer.exe",
-            r"C:\Program Files (x86)\Rime\weasel-0.16.1\WeaselDeployer.exe",
-            r"C:\Program Files (x86)\Rime\weasel-0.16.0\WeaselDeployer.exe",
-            r"C:\Program Files\Rime\WeaselDeployer.exe",
-            r"C:\Program Files (x86)\Rime\WeaselDeployer.exe",
-        ];
-        for c in &candidates {
-            if Path::new(c).exists() {
-                deployer = Some(c.to_string());
-                if weasel_root.is_none() {
-                    if let Some(parent) = Path::new(c).parent() {
-                        weasel_root = Some(parent.to_string_lossy().to_string());
-                    }
-                }
+    #[cfg(target_os = "macos")]
+    {
+        let squirrel_bin = Path::new("/Library/Input Methods/Squirrel.app/Contents/MacOS/Squirrel");
+        if squirrel_bin.exists() {
+            deployer = Some(squirrel_bin.to_string_lossy().to_string());
+        }
+    }
+
+    #[cfg(target_os = "linux")]
+    {
+        for bin in &["/usr/bin/rime_deployer", "/usr/bin/fcitx5-remote"] {
+            if Path::new(bin).exists() {
+                deployer = Some(bin.to_string());
                 break;
             }
         }

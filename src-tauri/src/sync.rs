@@ -100,7 +100,9 @@ fn decode_hex_utf8(hex: &str) -> Option<String> {
 }
 
 pub fn pick_sync_folder() -> Result<Option<String>, String> {
-    let script = r#"
+    #[cfg(target_os = "windows")]
+    {
+        let script = r#"
 [Console]::OutputEncoding = [System.Text.Encoding]::UTF8
 $OutputEncoding = [System.Text.Encoding]::UTF8
 Add-Type -AssemblyName System.Windows.Forms
@@ -115,26 +117,58 @@ if ($dialog.ShowDialog($form) -eq [System.Windows.Forms.DialogResult]::OK) {
 }
 "#;
 
-    let mut cmd = Command::new("powershell");
-    #[cfg(windows)]
-    {
+        let mut cmd = Command::new("powershell");
         use std::os::windows::process::CommandExt;
         cmd.creation_flags(0x08000000); // CREATE_NO_WINDOW: 隐藏黑窗口
-    }
-    let output = cmd
-        .args(["-NoProfile", "-NonInteractive", "-WindowStyle", "Hidden", "-STA", "-Command", script])
-        .output()
-        .map_err(|e| format!("启动文件夹选择窗口失败: {}", e))?;
+        let output = cmd
+            .args(["-NoProfile", "-NonInteractive", "-WindowStyle", "Hidden", "-STA", "-Command", script])
+            .output()
+            .map_err(|e| format!("启动文件夹选择窗口失败: {}", e))?;
 
-    let raw = String::from_utf8_lossy(&output.stdout).trim().to_string();
-    if raw.is_empty() {
-        return Ok(None);
+        let raw = String::from_utf8_lossy(&output.stdout).trim().to_string();
+        if raw.is_empty() {
+            return Ok(None);
+        }
+
+        let path_str = decode_hex_utf8(&raw).unwrap_or(raw);
+        if path_str.is_empty() {
+            Ok(None)
+        } else {
+            Ok(Some(path_str))
+        }
     }
 
-    let path_str = decode_hex_utf8(&raw).unwrap_or(raw);
-    if path_str.is_empty() {
-        Ok(None)
-    } else {
-        Ok(Some(path_str))
+    #[cfg(target_os = "macos")]
+    {
+        let script = "POSIX path of (choose folder with prompt \"请选择 Rime 同步文件夹\")";
+        let output = Command::new("osascript")
+            .args(["-e", script])
+            .output()
+            .map_err(|e| format!("启动文件夹选择窗口失败: {}", e))?;
+
+        let raw = String::from_utf8_lossy(&output.stdout).trim().to_string();
+        if raw.is_empty() {
+            Ok(None)
+        } else {
+            Ok(Some(raw))
+        }
+    }
+
+    #[cfg(target_os = "linux")]
+    {
+        let output = Command::new("zenity")
+            .args(["--file-selection", "--directory", "--title=请选择 Rime 同步文件夹"])
+            .output();
+
+        if let Ok(o) = output {
+            let raw = String::from_utf8_lossy(&o.stdout).trim().to_string();
+            if raw.is_empty() {
+                Ok(None)
+            } else {
+                Ok(Some(raw))
+            }
+        } else {
+            Ok(None)
+        }
     }
 }

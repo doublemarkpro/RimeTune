@@ -10,55 +10,19 @@ permissions:
   contents: write
 
 jobs:
-  release:
-    name: Build & Release (${{ matrix.platform }})
-    strategy:
-      fail-fast: false
-      matrix:
-        include:
-          - platform: 'windows-latest'
-            target: 'x86_64-pc-windows-msvc'
-            args: ''
-          - platform: 'macos-latest'
-            target: 'aarch64-apple-darwin'
-            args: '--target aarch64-apple-darwin'
-          - platform: 'ubuntu-22.04'
-            target: 'x86_64-unknown-linux-gnu'
-            args: ''
-
-    runs-on: ${{ matrix.platform }}
+  init-release:
+    name: Initialize GitHub Release
+    runs-on: ubuntu-latest
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
 
-      - name: Setup Node.js
-        uses: actions/setup-node@v4
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v2
         with:
-          node-version: 20
-          cache: 'npm'
-
-      - name: Install Rust toolchain
-        uses: dtolnay/rust-toolchain@stable
-        with:
-          targets: ${{ matrix.target }}
-
-      - name: Install Linux dependencies
-        if: matrix.platform == 'ubuntu-22.04'
-        run: |
-          sudo apt-get update
-          sudo apt-get install -y libwebkit2gtk-4.1-dev libappindicator3-dev librsvg2-dev patchelf libssl-dev libgtk-3-dev build-essential
-
-      - name: Install frontend dependencies
-        run: npm ci
-
-      - name: Build Tauri App
-        uses: tauri-apps/tauri-action@v0
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        with:
-          tagName: ${{ github.ref_name }}
-          releaseName: 'RimeTune ${{ github.ref_name }}'
-          releaseBody: |
+          tag_name: ${{ github.ref_name }}
+          name: 'RimeTune ${{ github.ref_name }}'
+          body: |
             ## 🌟 RimeTune ${{ github.ref_name }} 版本发布
 
             RimeTune 是一款专为 **Rime（中州韵输入法引擎）全平台（Windows 小狼毫 Weasel、macOS 鼠须管 Squirrel、Linux ibus/fcitx5-rime）** 量身打造的现代图形化配置与管理中心。
@@ -67,7 +31,7 @@ jobs:
 
             ### 🚀 更新亮点
             - **WeaselTune 全新升级为 RimeTune 跨平台配置中心**：从原专属 Windows 小狼毫工具正式蜕变升级为统一的 Rime 中州韵全平台配置中心；
-            - **底层路径归一化重构**：消除跨系统环境下的路径解析差异，保障配置备份与词库迁移平滑无损；
+            - **底层路径归一化重构**：消除跨系统环境下的路径解析差异，保障跨环境一致性；
             - **万象拼音 Octagram 上下文语言模型完整支持**：
               - 自动扫描并识别用户目录下所有 `*.gram` 语言模型文件（如官方 `wanxiang-lts-zh-hans.gram`），并在仪表盘呈现专属诊断卡片；
               - 零破坏挂载补丁，支持一键启用/禁用；
@@ -81,13 +45,11 @@ jobs:
 
             ### 💻 系统与平台支持 (System Requirements)
             - **🪟 Windows**：Windows 10 / 11 (64位)
-              - `RimeTune.exe`：绿色免安装便携版（解压即用）
-              - `RimeTune_*_x64-setup.exe`：向导安装包（带桌面图标与标准卸载）
-            - **🍎 macOS**：macOS 11 (Big Sur) 及以上（支持 Apple Silicon M1/M2/M3/M4 系列与 Intel 架构）
+              - `RimeTune.exe` / `RimeTune-windows-x64-portable.zip`：纯绿色免安装便携版（解压即用，原生无冗余）
+            - **🍎 macOS**：macOS 11 (Big Sur) 及以上（原生支持 Apple Silicon M1/M2/M3/M4 系列芯片）
               - `.dmg`：拖拽式安装镜像
-              - `.app`：独立应用程序包
             - **🐧 Linux**：Ubuntu 22.04+、Debian 11/12、Arch Linux、Fedora 38+、Linux Mint、Deepin / 统信 UOS 等
-              - `.AppImage`：免安装便携单文件
+              - `.AppImage`：免安装便携单文件（全发行版通用）
               - `.deb`：Debian / Ubuntu 系标准安装包
 
             ---
@@ -106,6 +68,126 @@ jobs:
             - **AppImage 用户**：下载 `.AppImage` 文件后，右键「属性」-> 勾选「允许作为程序执行文件」，或在终端执行 `chmod +x RimeTune_*.AppImage`，随后直接双击即可运行；
             - **Deb 用户**：双击安装或在终端执行 `sudo dpkg -i RimeTune_*.deb`；
             - **宿主支持**：自动检测并适配 Fcitx5-Rime 与 IBus-Rime 用户目录。
-          releaseDraft: false
+          draft: false
           prerelease: false
-          args: ${{ matrix.args }}
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+  build-windows:
+    name: Build Windows (Portable Only)
+    needs: [init-release]
+    runs-on: windows-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: 'npm'
+
+      - name: Install Rust toolchain
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Install frontend dependencies
+        run: npm ci
+
+      - name: Build Windows Portable EXE (No Installer)
+        run: npm run build:portable
+
+      - name: Package Portable Binaries
+        shell: pwsh
+        run: |
+          $exePath = "src-tauri/target/release/RimeTune.exe"
+          if (-not (Test-Path $exePath)) {
+            Write-Error "Portable binary not found at $exePath"
+            exit 1
+          }
+          New-Item -ItemType Directory -Force -Path "dist-portable" | Out-Null
+          Copy-Item $exePath -Destination "dist-portable/RimeTune.exe"
+          Compress-Archive -Path $exePath -DestinationPath "dist-portable/RimeTune-windows-x64-portable.zip" -Force
+
+      - name: Upload Windows Artifacts to Release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ github.ref_name }}
+          files: |
+            dist-portable/RimeTune.exe
+            dist-portable/RimeTune-windows-x64-portable.zip
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+  build-macos:
+    name: Build macOS (Apple Silicon DMG)
+    needs: [init-release]
+    runs-on: macos-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: 'npm'
+
+      - name: Install Rust toolchain
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: aarch64-apple-darwin
+
+      - name: Install frontend dependencies
+        run: npm ci
+
+      - name: Build macOS DMG
+        run: npm run tauri build -- --target aarch64-apple-darwin
+
+      - name: Upload macOS Artifacts to Release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ github.ref_name }}
+          files: |
+            src-tauri/target/aarch64-apple-darwin/release/bundle/dmg/*.dmg
+          fail_on_unmatched_files: false
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+  build-linux:
+    name: Build Linux (Deb & AppImage)
+    needs: [init-release]
+    runs-on: ubuntu-22.04
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: 'npm'
+
+      - name: Install Rust toolchain
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Install Linux dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y libwebkit2gtk-4.1-dev libappindicator3-dev librsvg2-dev patchelf libssl-dev libgtk-3-dev build-essential libfuse2
+
+      - name: Install frontend dependencies
+        run: npm ci
+
+      - name: Build Linux Bundles (Deb & AppImage)
+        run: npm run tauri build
+
+      - name: Upload Linux Artifacts to Release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ github.ref_name }}
+          files: |
+            src-tauri/target/release/bundle/deb/*.deb
+            src-tauri/target/release/bundle/appimage/*.AppImage
+          fail_on_unmatched_files: false
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

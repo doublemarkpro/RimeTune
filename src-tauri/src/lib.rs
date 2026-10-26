@@ -101,17 +101,50 @@ fn open_in_explorer(path: String) -> Result<(), String> {
     if !p.exists() {
         return Err(format!("路径不存在: {}", path));
     }
-    if p.is_file() {
-        std::process::Command::new("explorer")
-            .arg(format!("/select,{}", path))
-            .spawn()
-            .map_err(|e| format!("打开资源管理器失败: {}", e))?;
-    } else {
-        std::process::Command::new("explorer")
-            .arg(&path)
-            .spawn()
-            .map_err(|e| format!("打开资源管理器失败: {}", e))?;
+
+    #[cfg(target_os = "windows")]
+    {
+        if p.is_file() {
+            std::process::Command::new("explorer")
+                .arg(format!("/select,{}", path))
+                .spawn()
+                .map_err(|e| format!("打开资源管理器失败: {}", e))?;
+        } else {
+            std::process::Command::new("explorer")
+                .arg(&path)
+                .spawn()
+                .map_err(|e| format!("打开资源管理器失败: {}", e))?;
+        }
     }
+
+    #[cfg(target_os = "macos")]
+    {
+        if p.is_file() {
+            std::process::Command::new("open")
+                .args(["-R", &path])
+                .spawn()
+                .map_err(|e| format!("打开 Finder 失败: {}", e))?;
+        } else {
+            std::process::Command::new("open")
+                .arg(&path)
+                .spawn()
+                .map_err(|e| format!("打开 Finder 失败: {}", e))?;
+        }
+    }
+
+    #[cfg(target_os = "linux")]
+    {
+        let target = if p.is_file() {
+            p.parent().unwrap_or(p)
+        } else {
+            p
+        };
+        std::process::Command::new("xdg-open")
+            .arg(target)
+            .spawn()
+            .map_err(|e| format!("打开文件管理器失败: {}", e))?;
+    }
+
     Ok(())
 }
 
@@ -121,15 +154,33 @@ fn open_file_in_editor(path: String) -> Result<(), String> {
     if !p.exists() {
         return Err(format!("文件不存在: {}", path));
     }
-    let mut cmd = std::process::Command::new("cmd");
-    #[cfg(windows)]
+
+    #[cfg(target_os = "windows")]
     {
+        let mut cmd = std::process::Command::new("cmd");
         use std::os::windows::process::CommandExt;
         cmd.creation_flags(0x08000000); // CREATE_NO_WINDOW: 避免黑色 cmd 窗口闪烁
+        cmd.args(["/C", "start", "", &path])
+            .spawn()
+            .map_err(|e| format!("启动系统编辑器失败: {}", e))?;
     }
-    cmd.args(["/C", "start", "", &path])
-        .spawn()
-        .map_err(|e| format!("启动系统编辑器失败: {}", e))?;
+
+    #[cfg(target_os = "macos")]
+    {
+        std::process::Command::new("open")
+            .args(["-t", &path])
+            .spawn()
+            .map_err(|e| format!("启动系统文本编辑器失败: {}", e))?;
+    }
+
+    #[cfg(target_os = "linux")]
+    {
+        std::process::Command::new("xdg-open")
+            .arg(&path)
+            .spawn()
+            .map_err(|e| format!("启动系统编辑器失败: {}", e))?;
+    }
+
     Ok(())
 }
 
@@ -139,10 +190,31 @@ fn open_backups_folder(user_dir: String) -> Result<(), String> {
     if !backups_dir.exists() {
         let _ = std::fs::create_dir_all(&backups_dir);
     }
-    std::process::Command::new("explorer")
-        .arg(backups_dir.to_string_lossy().to_string())
-        .spawn()
-        .map_err(|e| format!("打开备份目录失败: {}", e))?;
+
+    #[cfg(target_os = "windows")]
+    {
+        std::process::Command::new("explorer")
+            .arg(backups_dir.to_string_lossy().to_string())
+            .spawn()
+            .map_err(|e| format!("打开备份目录失败: {}", e))?;
+    }
+
+    #[cfg(target_os = "macos")]
+    {
+        std::process::Command::new("open")
+            .arg(&backups_dir)
+            .spawn()
+            .map_err(|e| format!("打开备份目录失败: {}", e))?;
+    }
+
+    #[cfg(target_os = "linux")]
+    {
+        std::process::Command::new("xdg-open")
+            .arg(&backups_dir)
+            .spawn()
+            .map_err(|e| format!("打开备份目录失败: {}", e))?;
+    }
+
     Ok(())
 }
 

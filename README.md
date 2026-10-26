@@ -165,18 +165,13 @@ npm run tauri dev
 
 针对各操作系统平台，RimeTune 支持生成对应的标准发布格式：
 
-#### 🪟 Windows 平台打包
-- **方案 A：纯绿色便携单文件版 (Portable EXE) — 推荐日常使用**
-  ```bash
-  npm run build:portable
-  ```
-  - **输出文件**：`src-tauri/target/release/RimeTune.exe`
-  - **体积优势**：体积仅约 **4~5 MB**，双击秒开，原生无冗余，不在系统留下残留。
-- **方案 B：完整向导安装包 (NSIS Setup / MSI)**
-  ```bash
-  npm run build:installer   # 或 npm run tauri build
-  ```
-  - **输出文件**：`src-tauri/target/release/bundle/nsis/RimeTune_0.3.0_x64-setup.exe`
+#### 🪟 Windows 平台打包 (纯绿色免安装便携版)
+Windows 版专为绿色便携设计，无需繁琐的向导安装：
+```bash
+npm run build:portable
+```
+- **输出文件**：`src-tauri/target/release/RimeTune.exe`
+- **体积优势**：体积仅约 **4~5 MB**，双击秒开，原生无冗余，解压即用，不在系统留下残留。
 
 #### 🍎 macOS 平台打包 (生成 .dmg 镜像与 .app 包)
 在 macOS 终端中运行：

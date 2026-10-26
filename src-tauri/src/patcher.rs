@@ -1112,8 +1112,6 @@ pub fn scan_actual_installed_schemas(user_dir: &str) -> Vec<SchemaItem> {
 
 /// 扫描并枚举系统已安装的 TrueType/OpenType 字体
 pub fn enumerate_system_fonts() -> Vec<String> {
-    use winreg::enums::*;
-    use winreg::RegKey;
     use std::collections::BTreeSet;
 
     let mut fonts = BTreeSet::new();
@@ -1144,17 +1142,23 @@ pub fn enumerate_system_fonts() -> Vec<String> {
         fonts.insert(f.to_string());
     }
 
-    let hklm = RegKey::predef(HKEY_LOCAL_MACHINE);
-    if let Ok(font_key) = hklm.open_subkey("SOFTWARE\\Microsoft\\Windows NT\\CurrentVersion\\Fonts") {
-        for (name, _) in font_key.enum_values().flatten() {
-            let mut clean = name.clone();
-            if let Some(idx) = clean.find('(') {
-                clean = clean[..idx].trim().to_string();
-            }
-            for part in clean.split('&') {
-                let p = part.trim();
-                if !p.is_empty() && !p.starts_with('@') && p.len() > 1 {
-                    fonts.insert(p.to_string());
+    #[cfg(windows)]
+    {
+        use winreg::enums::*;
+        use winreg::RegKey;
+
+        let hklm = RegKey::predef(HKEY_LOCAL_MACHINE);
+        if let Ok(font_key) = hklm.open_subkey("SOFTWARE\\Microsoft\\Windows NT\\CurrentVersion\\Fonts") {
+            for (name, _) in font_key.enum_values().flatten() {
+                let mut clean = name.clone();
+                if let Some(idx) = clean.find('(') {
+                    clean = clean[..idx].trim().to_string();
+                }
+                for part in clean.split('&') {
+                    let p = part.trim();
+                    if !p.is_empty() && !p.starts_with('@') && p.len() > 1 {
+                        fonts.insert(p.to_string());
+                    }
                 }
             }
         }
@@ -2104,7 +2108,12 @@ fn decode_hex_utf8(hex: &str) -> Option<String> {
 }
 
 pub fn import_dict_file_dialog(user_dir: &str) -> Result<Option<CustomDictItem>, String> {
-    let script = r#"
+    #[allow(unused_assignments)]
+    let mut selected_path_str = String::new();
+
+    #[cfg(target_os = "windows")]
+    {
+        let script = r#"
 [Console]::OutputEncoding = [System.Text.Encoding]::UTF8
 $OutputEncoding = [System.Text.Encoding]::UTF8
 Add-Type -AssemblyName System.Windows.Forms
@@ -2120,23 +2129,54 @@ if ($dialog.ShowDialog($form) -eq [System.Windows.Forms.DialogResult]::OK) {
 }
 "#;
 
-    let mut cmd = std::process::Command::new("powershell");
-    #[cfg(windows)]
-    {
+        let mut cmd = std::process::Command::new("powershell");
         use std::os::windows::process::CommandExt;
         cmd.creation_flags(0x08000000); // CREATE_NO_WINDOW: 隐藏黑窗口
-    }
-    let output = cmd
-        .args(["-NoProfile", "-NonInteractive", "-WindowStyle", "Hidden", "-STA", "-Command", script])
-        .output()
-        .map_err(|e| format!("启动文件选择器失败: {}", e))?;
+        let output = cmd
+            .args(["-NoProfile", "-NonInteractive", "-WindowStyle", "Hidden", "-STA", "-Command", script])
+            .output()
+            .map_err(|e| format!("启动文件选择器失败: {}", e))?;
 
-    let raw = String::from_utf8_lossy(&output.stdout).trim().to_string();
-    if raw.is_empty() {
-        return Ok(None);
+        let raw = String::from_utf8_lossy(&output.stdout).trim().to_string();
+        if raw.is_empty() {
+            return Ok(None);
+        }
+
+        selected_path_str = decode_hex_utf8(&raw).unwrap_or(raw);
     }
 
-    let selected_path_str = decode_hex_utf8(&raw).unwrap_or(raw);
+    #[cfg(target_os = "macos")]
+    {
+        let script = "POSIX path of (choose file of type {\"yaml\", \"txt\"} with prompt \"请选择要导入的 Rime 词库文件 (.dict.yaml 或 .txt)\")";
+        let output = std::process::Command::new("osascript")
+            .args(["-e", script])
+            .output()
+            .map_err(|e| format!("启动文件选择器失败: {}", e))?;
+
+        let raw = String::from_utf8_lossy(&output.stdout).trim().to_string();
+        if raw.is_empty() {
+            return Ok(None);
+        }
+        selected_path_str = raw;
+    }
+
+    #[cfg(target_os = "linux")]
+    {
+        let output = std::process::Command::new("zenity")
+            .args(["--file-selection", "--title=请选择要导入的 Rime 词库文件", "--file-filter=*.dict.yaml *.txt"])
+            .output();
+
+        if let Ok(o) = output {
+            let raw = String::from_utf8_lossy(&o.stdout).trim().to_string();
+            if raw.is_empty() {
+                return Ok(None);
+            }
+            selected_path_str = raw;
+        } else {
+            return Ok(None);
+        }
+    }
+
     if selected_path_str.is_empty() {
         return Ok(None);
     }
